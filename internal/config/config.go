@@ -4,6 +4,7 @@ package config
 import (
 	"bufio"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -20,6 +21,18 @@ type Config struct {
 	Temperature float64
 	// MaxStep ReAct 循环最大步数（防死循环），默认 20
 	MaxStep int
+
+	// EmbeddingModel 向量化模型 ID，默认 text-embedding-3-small
+	// 火山方舟示例：doubao-embedding-large-text-240915
+	EmbeddingModel string
+	// MemoryFile 长期记忆向量库的持久化文件路径，默认 ./data/memories.json
+	MemoryFile string
+	// MemoryTopK 每轮注入的相关长期记忆条数，默认 5
+	MemoryTopK int
+	// MemoryAutoExtract 是否开启每轮对话后的自动记忆抽取，默认开
+	MemoryAutoExtract bool
+	// MemoryWindow 短期记忆窗口（消息条数），超过则摘要压缩，默认 40
+	MemoryWindow int
 }
 
 // Load 先加载当前目录下的 .env（存在则加载），再读取环境变量生成配置。
@@ -34,6 +47,12 @@ func Load() (*Config, error) {
 		Model:       getEnvDefault("LLM_MODEL", "gpt-4o-mini"),
 		Temperature: 0.7,
 		MaxStep:     20,
+
+		EmbeddingModel:    getEnvDefault("LLM_EMBEDDING_MODEL", "text-embedding-3-small"),
+		MemoryFile:        getEnvDefault("MEMORY_FILE", "./data/memories.json"),
+		MemoryTopK:        getEnvInt("MEMORY_TOP_K", 5),
+		MemoryAutoExtract: getEnvBool("MEMORY_AUTO_EXTRACT", true),
+		MemoryWindow:      getEnvInt("MEMORY_WINDOW", 40),
 	}
 
 	if cfg.APIKey == "" {
@@ -54,6 +73,27 @@ func (errNoAPIKey) Error() string {
 func getEnvDefault(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+// getEnvInt 读取整型环境变量，缺失或非法时返回默认值。
+func getEnvInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
+}
+
+// getEnvBool 读取布尔环境变量（true/false/1/0），缺失或非法时返回默认值。
+func getEnvBool(key string, def bool) bool {
+	switch strings.ToLower(os.Getenv(key)) {
+	case "true", "1", "yes":
+		return true
+	case "false", "0", "no":
+		return false
 	}
 	return def
 }
